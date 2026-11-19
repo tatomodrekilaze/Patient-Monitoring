@@ -56,3 +56,38 @@ python -m unittest discover -s tests -p "test_*.py"
 ## License
 
 AGPL-3.0 (Ultralytics YOLO is AGPL).
+
+## Personal Note
+
+# Patient-Monitoring
+
+## Personal Note
+
+I built this project for **Alte University's MedTech Hackathon**, sponsored by **Tbilisi Medic**. The competition was intended for students in grades 10–12, and the organizers announced that they would select the 10 best teams.
+
+Unfortunately, I didn’t qualify for the top 10. But you know what? After discovering a few interesting things about their security, I started wondering whether they’d qualify for the RaidForums or BreachForums.
+
+But before we get into that, let me tell you something funny about the university that organized this hackathon and the company that sponsored it.
+
+Yo, bro, imagine organizing a technology hackathon while your own university's student portal supposedly has some of the most questionable security imaginable.
+Imagine students using their personal identification numbers as both their usernames and passwords. And imagine an IDOR vulnerability that could expose other students' personal information because the system doesn't properly verify who's allowed to access what. Like, bro, we're hosting a MedTech hackathon, but who's organizing a hackathon to fix the university's own software? 
+
+And then there's "Tbilisi Medic", the sponsor. Imagine signing up for a regular account on a platform and somehow discovering that its authorization system could let an ordinary user obtain SuperAdmin privileges. Bro, I came to participate in a hackathon, not to audition for the security team. LMAOO
+
+Anyway, back to the actual hackathon.
+
+The organizers said they would select the 10 best teams, and somehow, my project didn't make the cut. And you know what's even funnier? As far as I know, at least two of the teams that got selected built the following:
+
+The first team built a messaging app for patients and doctors. Like, bro, what's the fucking point? We already have WhatsApp and Messenger. Why are we reinventing something that literally everyone already uses?
+
+The second team built a fucking Arduino-powered car that delivers stuff to doctors. Basically, a nurse puts something on the car, and it drives over to the doctor.
+
+Like, bro, are we seriously reinventing walking now? 💀
+
+And somehow, my project didn't qualify for the top 10 while those projects did? I genuinely have no fucking clue what the judges were looking for. And keep in mind, this was a hackathon for 10th–12th graders. I'm not saying everyone else built garbage, but come on, man. How the fuck did I not make it into the top 10?
+
+Maybe my mistake was building Patient-Monitoring instead of another messaging app or a remote-controlled delivery car. 
+
+Anyway, maybe I'll have better luck next time.
+
+Or maybe I'll just build WhatsApp 2.0 and put some wheels on it.
