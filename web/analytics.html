@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>analytics</title>
+<link rel="stylesheet" href="/static/style.css?v=2">
+</head>
+<body>
+<div class="bar"><b>analytics</b><span class="sp"></span><a class="btn" href="/">dashboard</a></div>
+<div class="page">
+  <div class="box"><div class="hd">alerts / response</div><table class="kv" id="kpis"></table></div>
+  <div class="grid2">
+    <div class="box"><div class="hd">alerts by type</div><div class="bd"><canvas class="chart" id="kinds"></canvas></div></div>
+    <div class="box"><div class="hd">time to ack (s)</div><div class="bd"><canvas class="chart" id="resp"></canvas></div></div>
+  </div>
+  <div class="box"><div class="hd">camera vs hand count (bland-altman)</div>
+    <table class="kv" id="valKpis"></table>
+    <div class="bd"><canvas class="chart" id="ba"></canvas></div>
+    <div class="bd faint">one dot = one 60s "breath count" from the dashboard. lines = bias +- 1.96 sd, band = +-2/min</div>
+  </div>
+</div>
+<script src="/static/common.js?v=2"></script>
+<script>
+const KIND = {};
+
+function bars(id, entries) {
+  const { c, w: W, h: H } = fitCanvas($(id));
+  c.font = "11px monospace"; c.fillStyle = "#7d8389";
+  if (!entries.length) { c.fillText("no data", 6, 16); return; }
+  const max = Math.max(...entries.map((e) => e[1])), bw = (W - 10) / entries.length;
+  entries.forEach(([label, v], i) => {
+    const h = (v / max) * (H - 40), x = 5 + i * bw;
+    c.fillStyle = "#6fa8dc"; c.fillRect(x + 3, H - 22 - h, bw - 6, h);
+    c.fillStyle = "#c9cdd1"; c.fillText(v, x + 4, H - 26 - h);
+    c.fillStyle = "#7d8389"; c.fillText(String(label).slice(0, Math.max(3, Math.floor(bw / 7))), x + 3, H - 8);
+  });
+}
+
+function hist(id, values) {
+  const edges = [0, 15, 30, 60, 120, 300, Infinity], labels = ["<15", "15-30", "30-60", "60-120", "120-300", ">300"];
+  bars(id, values.length ? labels.map((l, i) => [l, values.filter((v) => v >= edges[i] && v < edges[i + 1]).length]) : []);
+}
+
+function blandAltman(v) {
+  const { c, w: W, h: H } = fitCanvas($("ba"));
+  c.font = "11px monospace"; c.fillStyle = "#7d8389";
+  if (!v.n) { c.fillText("no data yet", 6, 16); return; }
+  const xs = v.points.map((p) => p[0]), ys = v.points.map((p) => p[1]);
+  const x0 = Math.min(...xs, 6) - 2, x1 = Math.max(...xs, 30) + 2;
+  const yr = Math.max(4, ...ys.map(Math.abs), Math.abs(v.loa_low), Math.abs(v.loa_high)) + 1;
+  const X = (x) => 30 + ((x - x0) / (x1 - x0)) * (W - 40), Y = (y) => H / 2 - (y / yr) * (H / 2 - 14);
+  c.fillStyle = "rgba(91,185,116,.1)"; c.fillRect(30, Y(2), W - 40, Y(-2) - Y(2));
+  const line = (y, col, dash) => { c.strokeStyle = col; c.setLineDash(dash); c.beginPath(); c.moveTo(30, Y(y)); c.lineTo(W - 10, Y(y)); c.stroke(); };
+  line(0, "#2a2d31", []); line(v.bias, "#6fa8dc", []); line(v.loa_low, "#e0a93b", [4, 4]); line(v.loa_high, "#e0a93b", [4, 4]);
+  c.setLineDash([]); c.fillStyle = "#c9cdd1";
+  for (const [x, y] of v.points) c.fillRect(X(x) - 2, Y(y) - 2, 4, 4);
+  c.fillStyle = "#7d8389";
+  c.fillText(`+${yr.toFixed(0)}`, 2, Y(yr) + 10); c.fillText(`-${yr.toFixed(0)}`, 2, Y(-yr));
+  c.fillText("mean rr ->", W - 80, H - 4);
+}
+
+const row = (k, v) => `<tr><td>${k}</td><td>${v ?? "-"}</td></tr>`;
+
+async function load() {
+  const [a, i18n] = await Promise.all([
+    fetch("/api/analytics").then((r) => r.json()),
+    fetch("/api/i18n").then((r) => r.json()).catch(() => ({})),
+  ]);
+  Object.assign(KIND, i18n.alert_titles || {});
+  const s = a.alerts || {}, v = a.validation || { n: 0, points: [] };
+  $("kpis").innerHTML = [
+    row("total", s.total), row("critical", s.critical), row("escalated", s.escalated), row("beds", a.beds),
+    row("ack median", s.response_median_s != null ? s.response_median_s + "s" : null),
+    row("ack p90", s.response_p90_s != null ? s.response_p90_s + "s" : null),
+    row("acked < 60s", s.acked_within_60s_pct != null ? s.acked_within_60s_pct + "%" : null),
+    row("false alarms (nurse rated)", s.false_alarm_pct != null ? `${s.false_alarm_pct}% of ${s.rated}` : null),
+    ...Object.entries(s.precision_by_kind || {}).map(([k, p]) => row(`precision ${KIND[k] || k}`, p.precision_pct + "%")),
+  ].join("");
+  bars("kinds", Object.entries(s.by_kind || {}).map(([k, n]) => [KIND[k] || k, n]));
+  hist("resp", s.response_times || []);
+  $("valKpis").innerHTML = [
+    row("n", v.n), row("mae", v.mae != null ? v.mae + "/min" : null),
+    row("within 2/min", v.within_2_pct != null ? v.within_2_pct + "%" : null),
+    row("bias", v.bias), row("loa", v.n > 1 ? `${v.loa_low} .. ${v.loa_high}` : null),
+  ].join("");
+  blandAltman(v);
+}
+load();
+setInterval(load, 5000);
+</script>
+</body>
+</html>

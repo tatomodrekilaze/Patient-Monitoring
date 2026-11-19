@@ -1,0 +1,628 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Patient-Monitoring</title>
+<link rel="stylesheet" href="/static/style.css?v=2">
+</head>
+<body>
+<div class="flash" id="flash"></div>
+<div class="bar">
+  <b>Patient-Monitoring</b>
+  <span class="hide-s">beds <span id="nBeds">0</span></span>
+  <span>alerts <span id="nAlerts">0</span></span>
+  <span><i class="dot" id="conn"></i> ws</span>
+  <span class="sp"></span>
+  <button id="soundBtn">sound off</button>
+  <button id="pauseBtn">mute 2m</button>
+  <button id="handoverBtn">handover</button>
+  <button id="phoneBtn">phone</button>
+  <a class="btn" href="/analytics">analytics</a>
+  <a class="btn" href="/evidence">validation</a>
+  <span id="clock" class="dim"></span>
+</div>
+<div class="banner bad" id="offline">cloud mirror: bedside laptop offline</div>
+
+<div class="main">
+<div class="col">
+
+  <div class="box">
+    <div class="hd">
+      <span id="tabs" class="row"></span><span class="sp"></span>
+      <span id="liveLevel" class="t grey">-</span>
+    </div>
+    <div class="banner bad" id="apneaBanner"></div>
+    <div class="banner warn" id="baseBanner">learning baseline <span class="bar2"><i id="baseBar"></i></span> <span id="basePct"></span></div>
+    <div class="live">
+      <div class="video" id="videoWrap">
+        <img id="video" alt="">
+        <canvas id="zoneCanvas"></canvas>
+        <div class="osd"><span id="oName"></span><span id="oFps"></span><span class="sp"></span><span id="oMode"></span></div>
+        <div class="msg">no camera signal</div>
+      </div>
+      <table class="vit">
+        <tr><td><div class="lbl">resp rate</div><div class="num" id="rr">-</div><div class="dim" id="rrSub"></div><canvas class="wave" id="wave"></canvas></td></tr>
+        <tr><td><div class="lbl">heart rate (rppg)</div><div class="num" id="hr">-</div><div class="dim" id="hrSub"></div></td></tr>
+        <tr><td><div class="lbl">posture</div><div id="posture" style="font-size:16px;color:#fff">-</div><div class="dim" id="sleep"></div></td></tr>
+        <tr><td><div class="lbl">risk</div><div id="risk">-</div><div class="dim" id="explain"></div></td></tr>
+      </table>
+    </div>
+    <div class="ctl">
+      <span class="grp" id="privSeg"><button data-mode="skeleton">skel</button><button data-mode="blur">blur</button><button data-mode="raw">raw</button></span>
+      <span class="grp" id="magSeg"><button data-mag="">evm off</button><button data-mag="breath">evm resp</button><button data-mag="pulse">evm pulse</button></span>
+      <button id="zoneBtn">bed zone</button>
+      <button id="recalBtn">rebaseline</button>
+      <button id="visitBtn">log visit</button>
+      <span class="sp"></span>
+      <button id="sleepBtn">sleep</button>
+      <button id="reportBtn">report</button>
+      <button id="bedsideBtn">bedside</button>
+      <button id="familyBtn">family link</button>
+    </div>
+  </div>
+
+  <div class="box">
+    <div class="hd">features <span id="featCount" class="faint"></span></div>
+    <div class="feats" id="feats"></div>
+  </div>
+
+  <div class="grid2">
+    <div class="box">
+      <div class="hd">exams</div>
+      <table>
+        <tr><td>face test</td><td id="mFace" class="dim">-</td><td class="r"><button id="faceBtn">run</button></td></tr>
+        <tr><td>chair stand 30s</td><td id="mChair" class="dim">-</td><td class="r"><button id="chairBtn">run</button></td></tr>
+        <tr><td>breath count 60s</td><td id="valStatus" class="dim">-</td><td class="r nw"><button id="valStart">start</button> <button id="valTap" disabled>tap</button></td></tr>
+      </table>
+    </div>
+    <div class="box">
+      <div class="hd">talk to patient</div>
+      <div class="bd row">
+        <button data-say="n_coming">coming</button>
+        <button data-say="n_stay">stay in bed</button>
+        <button data-say="n_howareyou">ok?</button>
+        <button data-say="n_doctor">doctor</button>
+        <button id="pttBtn">hold to talk</button>
+      </div>
+      <form class="bd row" id="sayForm" style="padding-top:0"><input id="sayText" class="sp" placeholder="type, gets spoken"><button>send</button></form>
+      <div class="bd row" id="noteBox" style="padding-top:0;display:none"><button id="noteBtn">hold: voice note</button><span id="noteStatus" class="dim"></span></div>
+      <div id="notes"></div>
+    </div>
+  </div>
+
+  <details class="box" id="camPanel">
+    <summary class="hd" style="cursor:pointer">camera <span id="camSummary" class="faint"></span></summary>
+    <div class="bd grid2">
+      <table class="kv" id="camInfo"></table>
+      <div class="col" style="gap:6px">
+        <div class="row">stream <span class="grp ctl" style="border:0;padding:0" id="streamSeg"><button data-stream="main">main</button><button data-stream="sub">sub</button></span></div>
+        <div class="row">rotate <span class="grp ctl" style="border:0;padding:0" id="rotSeg"><button data-rot="0">0</button><button data-rot="90">90</button><button data-rot="180">180</button><button data-rot="270">270</button></span>
+          <label><input type="checkbox" id="mirrorChk"> mirror</label></div>
+        <div class="row">
+          <div class="dpad" id="dpad">
+            <span></span><button data-tilt="1">^</button><span></span>
+            <button data-pan="-1">&lt;</button><button id="ptzStop">x</button><button data-pan="1">&gt;</button>
+            <span></span><button data-tilt="-1">v</button><span></span>
+          </div>
+          <div class="col" style="gap:4px">speed <input type="range" id="ptzSpeed" min="0.2" max="1" step="0.1" value="0.5"><span class="faint" id="ptzNote"></span></div>
+        </div>
+        <div class="row"><button id="camReconnect">reconnect</button><a class="btn" id="camSnap" href="#" download>snapshot</a></div>
+      </div>
+    </div>
+  </details>
+
+  <div class="box" id="aiCard" style="display:none">
+    <div class="hd">assistant</div>
+    <form class="bd row" id="aiForm"><input id="aiQ" class="sp" placeholder="ask about the ward"><button>ask</button></form>
+    <pre class="bd dim" id="aiAnswer" style="margin:0;white-space:pre-wrap"></pre>
+  </div>
+
+</div>
+<div class="col">
+  <div class="box">
+    <div class="hd">alerts <span id="alertCount" class="faint"></span></div>
+    <div class="alerts"><table id="alerts"></table></div>
+  </div>
+  <div class="box">
+    <div class="hd">beds</div>
+    <table id="beds"></table>
+  </div>
+</div>
+</div>
+
+<dialog id="handoverDlg"><div class="hd">handover <span class="sp"></span><button id="aiHandover" style="display:none">ai version</button> <button id="copyHandover">copy</button> <button onclick="handoverDlg.close()">x</button></div><div class="bd"><pre id="handoverText"></pre></div></dialog>
+<dialog id="phoneDlg"><div class="hd">nurse phone <span class="sp"></span><button onclick="phoneDlg.close()">x</button></div><div class="bd"><div class="dim">same wifi, open on the phone:</div><div class="qr" id="qr"></div><div id="ntfyInfo" class="dim"></div></div></dialog>
+<dialog id="familyDlg"><div class="hd">family link <span class="sp"></span><button onclick="familyDlg.close()">x</button></div><div class="bd"><div class="dim">status only, no numbers or video</div><div class="qr" id="familyQr"></div></div></dialog>
+<dialog id="sleepDlg"><div class="hd">sleep <span class="sp"></span><button onclick="sleepDlg.close()">x</button></div><div class="bd"><table class="kv" id="sleepBody"></table></div></dialog>
+<dialog id="camDlg"><div class="hd">add camera <span class="sp"></span><button onclick="camDlg.close()">x</button></div>
+  <div class="bd col" style="gap:6px">
+    <div class="row"><input id="probeIp" placeholder="onvif ip"><button id="probeBtn" type="button">probe</button><span id="probeResult" class="dim"></span></div>
+    <form id="camForm" class="col" style="gap:6px">
+      <input id="camName" placeholder="name">
+      <input id="camSrc" placeholder="rtsp:// | http://phone:8080/video | onvif://ip" required>
+      <div class="row"><button>add</button><span id="camStatus" class="dim"></span></div>
+    </form>
+  </div>
+</dialog>
+<dialog id="replayDlg"><div class="hd"><span id="replayTitle"></span><span class="sp"></span><button onclick="replayDlg.close()">x</button></div>
+  <div class="bd"><canvas id="replayCanvas" style="width:100%;height:340px;background:#000;display:block"></canvas>
+    <div class="row" style="margin-top:6px"><button id="replayPlay">pause</button><input type="range" id="replaySeek" min="0" max="1000" class="sp"><span id="replayTime" class="dim"></span>
+      <span class="grp" id="replaySpeed"><button data-s="0.25">.25x</button><button data-s="1" class="on">1x</button></span></div>
+  </div>
+</dialog>
+
+<script src="/static/common.js?v=2"></script>
+<script>
+let live = null, liveId = null, lastState = null;
+clock($("clock"));
+
+fetch("/api/ai_status").then((r) => r.json()).then((s) => {
+  if (!s.ready) return;
+  $("aiCard").style.display = "";
+  $("noteBox").style.display = "";
+  $("aiHandover").style.display = "";
+}).catch(() => {});
+
+const watch = alertWatcher((a, escalated) => {
+  Sound.beep(a.severity === "critical" || escalated);
+  Voice.say(a, escalated);
+  if (a.severity === "critical") $("flash").classList.add("on");
+});
+
+connect((s) => {
+  lastState = s;
+  $("offline").classList.toggle("show", s.edge_online === false);
+  const cams = s.beds.filter((b) => !b.simulated).sort((a, b) => a.id.localeCompare(b.id));
+  if (!cams.find((b) => b.id === liveId) && cams.length) selectCam(cams[0].id);
+  renderTabs(cams, s.cameras || {});
+  live = cams.find((b) => b.id === liveId);
+  if (live) renderLive(live);
+  renderBeds(s.beds);
+  renderAlerts(s.alerts);
+  watch(s.alerts);
+  $("nBeds").textContent = s.beds.length;
+  const act = s.alerts.filter((a) => a.active).length;
+  $("nAlerts").textContent = act;
+  $("nAlerts").className = act ? "bad" : "";
+}, (ok) => $("conn").classList.toggle("ok", ok));
+
+function selectCam(id) {
+  liveId = id;
+  $("video").src = `/video/${id}?t=${Date.now()}`;
+  camInfo = null;
+  if ($("camPanel").open) loadCamera(true);
+}
+
+function renderTabs(cams, pending) {
+  const t = cams.map((b) => `<button class="${b.id === liveId ? "on" : ""}" onclick="selectCam('${b.id}')">${esc(b.name)}</button>`);
+  for (const c of Object.values(pending)) {
+    if (c.state === "connecting") t.push(`<button disabled>${esc(c.name)} ...</button>`);
+    if (c.state === "error") t.push(`<button disabled title="${esc(c.error)}">${esc(c.name)} ERR</button>`);
+  }
+  t.push(`<button onclick="camDlg.showModal()">+</button>`);
+  setHTML($("tabs"), t.join(""));
+}
+
+const MODE = { skeleton: "skel", blur: "blur", raw: "raw" };
+
+function renderLive(b) {
+  const f = Object.fromEntries((b.features || []).map((x) => [x.key, x]));
+  const off = b.camera_offline || ((b.features || []).length && b.features.every((x) => x.state === "off"));
+  $("videoWrap").classList.toggle("off", !!off);
+  $("liveLevel").className = "t " + b.level;
+  $("liveLevel").textContent = b.level_label;
+  $("oName").textContent = b.name + (b.night ? " [night]" : "");
+  $("oFps").textContent = `${Math.round(b.fps || 0)} fps`;
+  $("oMode").textContent = b.magnify ? `evm ${b.magnify}` : lastState?.cloud ? "skel (cloud)" : MODE[b.privacy] || b.privacy || "";
+
+  // resp
+  const base = (b.baseline || {}).ready ? `base ${b.baseline.rr}` : "";
+  if (b.rr != null) {
+    $("rr").innerHTML = `${Math.round(b.rr)} <small>/min ${ARROWS[b.trend] || ""}</small>`;
+    $("rr").className = "num" + (b.rr_valid ? "" : " dim");
+    $("rrSub").textContent = [base, `q ${Math.round(b.rr_quality * 100)}%`].filter(Boolean).join("  ");
+  } else {
+    $("rr").innerHTML = "-";
+    $("rrSub").textContent = f.breathing ? f.breathing.detail : "";
+  }
+  // hr
+  $("hr").innerHTML = b.hr != null ? `${b.hr} <small>/min</small>` : "-";
+  $("hrSub").textContent = b.hr != null ? (b.hr_status === "hold" ? "last good reading" : "") : f.heart_rate ? f.heart_rate.detail : "";
+  // posture
+  let pos = !b.present ? "not visible" : b.posture_label;
+  if (b.hidden) pos = "in bed, hidden";
+  if (b.floor_s >= 1) pos = `on floor ${Math.floor(b.floor_s)}s`;
+  $("posture").textContent = pos;
+  $("posture").className = b.posture === "floor" ? "bad" : "";
+  $("sleep").textContent = [b.present && ["lying", "reclined"].includes(b.posture) ? b.sleep_label : "",
+    b.eyes_open == null ? "" : b.eyes_open ? "eyes open" : "eyes closed"].filter((x) => x && x !== "-").join("  ");
+  // risk
+  $("risk").innerHTML = `<span class="t ${b.level}">${esc(b.level_label)}</span> score ${b.score ?? 0}` + (b.trend ? `  trend ${esc(b.trend_label)}` : "");
+  $("explain").textContent = (b.explain || []).map((p) => `${p.key} +${p.points}`).join("  ");
+
+  const ap = $("apneaBanner");
+  ap.classList.toggle("show", b.apnea_s >= 4);
+  ap.textContent = b.apnea_s >= 10 ? `APNEA ${Math.floor(b.apnea_s)}s` : `no breath seen ${Math.floor(b.apnea_s)}s`;
+  const bl = b.baseline || {};
+  $("baseBanner").classList.toggle("show", !bl.ready && ["lying", "reclined"].includes(b.posture));
+  $("baseBar").style.width = `${Math.round((bl.progress || 0) * 100)}%`;
+  $("basePct").textContent = `${Math.round((bl.progress || 0) * 100)}%`;
+
+  for (const x of $("privSeg").children) x.classList.toggle("on", x.dataset.mode === b.privacy && !b.magnify);
+  for (const x of $("magSeg").children) x.classList.toggle("on", (x.dataset.mag || null) === (b.magnify || null));
+  $("magSeg").style.display = lastState?.cloud ? "none" : "";
+
+  const feats = b.features || [];
+  $("featCount").textContent = `${feats.filter((x) => x.state === "on").length}/${feats.length} on`;
+  setHTML($("feats"), feats.map((x) => `<div title="${esc(x.what)}"><span class="t ${x.state}">${x.state.toUpperCase().padEnd(4, " ")}</span><span class="n">${esc(x.name)}</span><span class="d">${esc(x.detail)}</span></div>`).join(""));
+
+  renderExams(b);
+  renderNotes(b.notes || []);
+  drawWave(b.wave || [], b.rr != null);
+}
+
+function renderExams(b) {
+  const ft = b.facetest;
+  const run = { smile: "smile...", eyes: "close eyes..." }[b.facetest_state];
+  $("mFace").textContent = run || (!ft ? "-" : !ft.measured ? "no face, retry" : ft.asymmetric ? `weak ${ft.side} side` : "symmetric");
+  $("mFace").className = ft && ft.asymmetric && !run ? "bad" : ft && ft.measured && !run ? "ok" : "dim";
+  $("faceBtn").disabled = b.facetest_state !== "idle";
+  const cr = { armed: "sit down...", seated: "go..." }[b.chair_state];
+  $("mChair").textContent = cr || (b.chair_count != null ? `${b.chair_count}${b.chair_state === "running" ? " ..." : b.chair_count < 8 ? " (<8 fall risk)" : ""}` : "-");
+  $("mChair").className = b.chair_state === "idle" && b.chair_count != null ? (b.chair_count < 8 ? "bad" : "ok") : "dim";
+  $("chairBtn").disabled = ["armed", "seated", "running"].includes(b.chair_state);
+}
+
+function drawWave(w, ok) {
+  const { c, w: W, h: H } = fitCanvas($("wave"));
+  c.strokeStyle = "#2a2d31"; c.beginPath(); c.moveTo(0, H / 2); c.lineTo(W, H / 2); c.stroke();
+  if (!ok || w.length < 2) return;
+  c.strokeStyle = LEVEL_COLOR[live?.level] || "#6fa8dc"; c.lineWidth = 1.2; c.beginPath();
+  w.forEach((v, i) => { const x = (i / (w.length - 1)) * W, y = H / 2 - v * (H / 5); i ? c.lineTo(x, y) : c.moveTo(x, y); });
+  c.stroke();
+}
+
+function renderBeds(beds) {
+  const rows = beds.map((b) => `
+    <tr class="${b.simulated ? "" : "click"} ${b.id === liveId ? "sel" : ""}" ${b.simulated ? "" : `onclick="selectCam('${b.id}')"`}>
+      <td>${esc(b.name)}${b.simulated ? ' <span class="t sim">sim</span>' : ""}<br><span class="t ${b.level}">${esc(b.level_label)}</span></td>
+      <td class="dim">${b.camera_offline ? "cam off" : !b.present ? "not visible" : esc(b.posture_label)}<br>visit ${ago(b.last_visit)}</td>
+      <td class="r"><span style="font-size:18px;color:#fff">${n0(b.rr)}</span> ${ARROWS[b.trend] || ""}<br><span class="dim">hr ${b.hr ?? "-"}</span></td>
+      <td><canvas class="spark" data-bed="${b.id}"></canvas></td>
+    </tr>`).join("");
+  $("beds").innerHTML = `<tr><th>bed</th><th>state</th><th class="r">rr</th><th>rr 10m</th></tr>` + (rows || '<tr><td colspan="4" class="dim">no beds</td></tr>');
+  for (const b of beds) sparkline($("beds").querySelector(`canvas[data-bed="${b.id}"]`), b.rr_history, LEVEL_COLOR[b.level]);
+}
+
+function renderAlerts(alerts) {
+  $("alertCount").textContent = alerts.filter((a) => a.active).length + " active";
+  const html = alerts.map((a) => `
+    <tr class="${a.severity} ${a.active ? "act" : ""}">
+      <td class="nw dim">${hm(a.ts)}</td>
+      <td>${esc(a.bed_name)}: ${esc(a.message)}${a.escalated && a.active ? ' <span class="t red">esc</span>' : ""}
+        ${a.acked ? `<span class="faint"> ack${a.ack_ts ? " " + Math.round(a.ack_ts - a.ts) + "s" : ""}</span>` : ""}</td>
+      <td class="r nw">${a.replay ? `<button onclick="openReplay(${a.id})" title="skeleton replay">rp</button>` : ""}${a.active ? `<button onclick="post('/api/alerts/${a.id}/ack')">ack</button>` : ""}${a.feedback
+        ? `<span class="faint"> ${a.feedback === "true" ? "real" : "false"}</span>`
+        : `<button title="real" onclick="fb(${a.id},'true')">y</button><button title="false alarm" onclick="fb(${a.id},'false')">n</button>`}</td>
+    </tr>`).join("");
+  setHTML($("alerts"), html || '<tr><td class="dim">none</td></tr>');
+  if (!alerts.some((a) => a.active && a.severity === "critical")) $("flash").classList.remove("on");
+}
+function fb(id, value) { post(`/api/alerts/${id}/feedback`, { value }); }
+
+let notesKey = "";
+function renderNotes(notes) {
+  const key = notes.map((n) => n.ts).join();
+  if (key === notesKey) return;
+  notesKey = key;
+  $("notes").innerHTML = notes.length ? "<table>" + notes.slice().reverse().map((n) =>
+    `<tr><td class="dim nw">${hm(n.ts)}</td><td class="${n.urgency === "urgent" ? "bad" : n.urgency === "soon" ? "warn" : ""}">${esc(n.summary || n.transcript || "")}</td></tr>`).join("") + "</table>" : "";
+}
+
+// replay (skeleton only)
+const BONES = [[5, 6], [5, 7], [7, 9], [6, 8], [8, 10], [5, 11], [6, 12], [11, 12], [11, 13], [13, 15], [12, 14], [14, 16], [0, 1], [0, 2], [1, 3], [2, 4]];
+let rp = null;
+async function openReplay(id) {
+  const r = await fetch(`/api/replays/${id}`);
+  if (!r.ok) return;
+  const data = await r.json();
+  if (!data.frames || !data.frames.length) return;
+  rp = { data, t0: data.frames[0].t, t1: data.frames[data.frames.length - 1].t, pos: 0, playing: true, speed: 1, last: null };
+  $("replayTitle").textContent = data.message;
+  replayDlg.showModal();
+  requestAnimationFrame(replayTick);
+}
+function replayTick(now) {
+  if (!rp || !replayDlg.open) return;
+  if (rp.playing && rp.last != null) {
+    rp.pos += (now - rp.last) / 1000 * rp.speed;
+    if (rp.pos > rp.t1 - rp.t0) rp.pos = 0;
+  }
+  rp.last = now;
+  drawReplay();
+  requestAnimationFrame(replayTick);
+}
+function drawReplay() {
+  const { data } = rp;
+  const { c, w: W, h: H } = fitCanvas($("replayCanvas"));
+  const [fw, fh] = data.size || [640, 360], s = Math.min(W / fw, H / fh), ox = (W - fw * s) / 2, oy = (H - fh * s) / 2;
+  const t = rp.t0 + rp.pos;
+  let f = data.frames[0];
+  for (const x of data.frames) { if (x.t <= t) f = x; else break; }
+  if (data.zone) {
+    const [x1, y1, x2, y2] = data.zone;
+    c.strokeStyle = "#444"; c.setLineDash([4, 4]);
+    c.strokeRect(ox + x1 * fw * s, oy + y1 * fh * s, (x2 - x1) * fw * s, (y2 - y1) * fh * s);
+    c.setLineDash([]);
+  }
+  for (const p of f.people) {
+    c.strokeStyle = p.patient ? (LEVEL_COLOR[f.level] || "#6fa8dc") : "#777"; c.lineWidth = 2;
+    for (const [a, b] of BONES) {
+      if (p.conf[a] < 0.4 || p.conf[b] < 0.4) continue;
+      c.beginPath(); c.moveTo(ox + p.kps[a][0] * s, oy + p.kps[a][1] * s); c.lineTo(ox + p.kps[b][0] * s, oy + p.kps[b][1] * s); c.stroke();
+    }
+  }
+  const rel = t - data.t_event;
+  c.fillStyle = Math.abs(rel) < 0.6 ? "#e5534b" : "#bbb"; c.font = "12px monospace";
+  c.fillText(`t${rel >= 0 ? "+" : ""}${rel.toFixed(1)}s  ${f.state || ""}`, 8, 16);
+  const span = rp.t1 - rp.t0 || 1;
+  c.fillStyle = "#e5534b"; c.fillRect(((data.t_event - rp.t0) / span) * W - 1, H - 8, 2, 8);
+  $("replaySeek").value = Math.round((rp.pos / span) * 1000);
+  $("replayTime").textContent = `${rel >= 0 ? "+" : ""}${rel.toFixed(1)}s`;
+}
+$("replayPlay").onclick = () => { if (!rp) return; rp.playing = !rp.playing; $("replayPlay").textContent = rp.playing ? "pause" : "play"; };
+$("replaySeek").oninput = (e) => { if (rp) { rp.pos = (e.target.value / 1000) * (rp.t1 - rp.t0); rp.playing = false; $("replayPlay").textContent = "play"; } };
+$("replaySpeed").onclick = (e) => {
+  const v = e.target.dataset.s; if (!v || !rp) return;
+  rp.speed = +v;
+  for (const b of $("replaySpeed").children) b.classList.toggle("on", b === e.target);
+};
+
+// controls
+$("faceBtn").onclick = () => post(`/api/beds/${liveId}/face_test`, {});
+$("chairBtn").onclick = () => post(`/api/beds/${liveId}/chair_stand`, {});
+document.querySelectorAll("[data-say]").forEach((b) => b.onclick = () => liveId && post(`/api/beds/${liveId}/say`, { preset: b.dataset.say }));
+$("sayForm").onsubmit = (e) => {
+  e.preventDefault();
+  const text = $("sayText").value.trim();
+  if (!text || !liveId) return;
+  $("sayText").value = "";
+  post(`/api/beds/${liveId}/say`, { text });
+};
+holdToRecord($("pttBtn"), (blob) => postAudio(`/api/beds/${liveId}/say_audio`, blob));
+holdToRecord($("noteBtn"), async (blob) => {
+  $("noteStatus").textContent = "processing";
+  try {
+    const r = await postAudio(`/api/beds/${liveId}/note_audio`, blob);
+    $("noteStatus").textContent = r.ok ? "saved" : (r.error || "error");
+  } catch (e) { $("noteStatus").textContent = "network error"; }
+});
+
+$("sleepBtn").onclick = async () => {
+  const r = await fetch(`/api/beds/${liveId}/sleep_report`).then((r) => r.json());
+  const rows = !r.samples ? [["", "no data yet"]] : [
+    ["asleep", `${Math.floor(r.asleep_min / 60)}h ${r.asleep_min % 60}m`], ["in bed", `${r.in_bed_min}m`],
+    ["efficiency", r.efficiency_pct != null ? r.efficiency_pct + "%" : "-"], ["wakeups", r.wakeups],
+    ["longest", `${r.longest_sleep_min}m`], ["rr asleep", r.rr_asleep_median ?? "-"],
+    ["apneas", r.apnea_episodes], ["bed exits", r.bed_exits]];
+  $("sleepBody").innerHTML = rows.map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join("");
+  sleepDlg.showModal();
+};
+$("bedsideBtn").onclick = () => liveId && window.open(`/bedside/${liveId}`, "_blank");
+$("reportBtn").onclick = () => liveId && window.open(`/report/${liveId}`, "_blank");
+$("visitBtn").onclick = () => liveId && post(`/api/beds/${liveId}/visit`);
+$("recalBtn").onclick = () => liveId && confirm("restart baseline?") && post(`/api/beds/${liveId}/recalibrate`);
+for (const x of $("privSeg").children) x.onclick = () => {
+  if (!liveId) return;
+  post(`/api/beds/${liveId}/magnify`, { mode: null });
+  post(`/api/beds/${liveId}/privacy`, { mode: x.dataset.mode });
+};
+for (const x of $("magSeg").children) x.onclick = () => liveId && post(`/api/beds/${liveId}/magnify`, { mode: x.dataset.mag || null });
+
+$("soundBtn").onclick = () => {
+  Sound.enable(); Voice.on = true; Sound.beep(false);
+  $("soundBtn").textContent = "sound on";
+  $("soundBtn").classList.add("on");
+};
+$("pauseBtn").onclick = () => {
+  const on = !Sound.paused;
+  Sound.pausedUntil = on ? Date.now() + 120000 : 0;
+  post("/api/alarm_pause", { seconds: on ? 120 : 0 });
+};
+setInterval(() => {
+  const left = Math.ceil((Sound.pausedUntil - Date.now()) / 1000);
+  $("pauseBtn").classList.toggle("warnb", left > 0);
+  $("pauseBtn").textContent = left > 0 ? `muted ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}` : "mute 2m";
+}, 500);
+
+$("handoverBtn").onclick = async () => {
+  $("handoverText").textContent = "...";
+  handoverDlg.showModal();
+  $("handoverText").textContent = await fetch("/api/handover?hours=8").then((r) => r.text());
+};
+$("aiHandover").onclick = async () => {
+  $("handoverText").textContent = "...";
+  $("handoverText").textContent = await fetch("/api/handover?ai=true").then((r) => r.text());
+};
+$("copyHandover").onclick = () => navigator.clipboard?.writeText($("handoverText").textContent);
+const qrBlock = (u) => `<div><img src="/qr.png?url=${encodeURIComponent(u)}" alt="" onerror="this.remove()"><div class="dim">${esc(u)}</div></div>`;
+$("phoneBtn").onclick = async () => {
+  const info = await fetch("/api/info").then((r) => r.json());
+  $("qr").innerHTML = info.nurse_urls.map(qrBlock).join("") || '<span class="dim">no lan address found</span>';
+  $("ntfyInfo").textContent = info.ntfy_topic ? `ntfy topic: ${info.ntfy_topic}` : "";
+  phoneDlg.showModal();
+};
+$("familyBtn").onclick = async () => {
+  const r = await fetch(`/api/beds/${liveId}/family_link`).then((r) => r.json());
+  $("familyQr").innerHTML = qrBlock(r.url);
+  familyDlg.showModal();
+};
+
+// camera panel
+let camInfo = null;
+async function loadCamera(probe = false) {
+  if (!liveId) return;
+  try {
+    const r = await fetch(`/api/beds/${liveId}/camera${probe ? "?probe=true" : ""}`);
+    if (!r.ok) { $("camPanel").style.display = "none"; return; }
+    $("camPanel").style.display = "";
+    const info = await r.json();
+    camInfo = probe ? info : { ...(camInfo || {}), ...info };
+    renderCamera(camInfo);
+  } catch (e) {}
+}
+function renderCamera(c) {
+  $("camSummary").textContent = `${c.kind || ""} ${c.connected ? "connected" : "DOWN"}` + (c.in_size ? ` ${c.in_size[0]}x${c.in_size[1]}` : "");
+  for (const b of $("streamSeg").children) {
+    b.classList.toggle("on", b.dataset.stream === c.stream);
+    const p = (c.profiles || [])[b.dataset.stream === "main" ? 0 : 1];
+    b.textContent = b.dataset.stream + (p ? ` ${p.width}x${p.height}` : "");
+    b.disabled = !c.onvif;
+  }
+  for (const b of $("rotSeg").children) b.classList.toggle("on", +b.dataset.rot === c.rotate);
+  $("mirrorChk").checked = !!c.mirror;
+  $("dpad").classList.toggle("disabled", !c.host);
+  $("ptzNote").textContent = c.host ? "arrow keys work" : "no ptz";
+  $("camSnap").href = `/api/beds/${liveId}/snapshot.jpg`;
+  const d = c.device || {};
+  const rows = [
+    ["status", c.switching ? "switching" : c.connected ? "ok" : "down"],
+    ["host", c.host || "-"],
+    ["device", d.manufacturer ? `${d.manufacturer} ${d.model || ""}` : "-"],
+    ["input", c.in_size ? `${c.in_size[0]}x${c.in_size[1]}` : "-"],
+    ["fps cam / ai", `${c.in_fps ?? "-"} / ${c.processing_fps ?? "-"}`],
+    ["delay", c.delay_s == null ? "-" : Math.round(c.delay_s * 1000) + " ms"],
+    ["frame gaps p50/p95/max", c.gap_p50_ms == null ? "-" : `${c.gap_p50_ms}/${c.gap_p95_ms}/${c.gap_max_ms} ms`],
+    ["crops", c.hires ? "full res" : "working frame"],
+    ["reconnects", c.reconnects ?? 0],
+  ];
+  $("camInfo").innerHTML = rows.map(([k, v]) => `<tr><td>${k}</td><td>${esc(String(v))}</td></tr>`).join("");
+}
+$("camPanel").addEventListener("toggle", () => { if ($("camPanel").open) loadCamera(!camInfo); });
+setInterval(() => { if ($("camPanel").open) loadCamera(false); }, 2000);
+async function camSet(body) {
+  const r = await post(`/api/beds/${liveId}/camera`, body);
+  if (r && !r.detail) { camInfo = { ...camInfo, ...r }; renderCamera(camInfo); }
+}
+$("streamSeg").onclick = (e) => { const s = e.target.dataset.stream; if (s) camSet({ stream: s }); };
+$("rotSeg").onclick = (e) => { const r = e.target.dataset.rot; if (r != null) camSet({ rotate: +r }); };
+$("mirrorChk").onchange = () => camSet({ mirror: $("mirrorChk").checked });
+$("camReconnect").onclick = () => post(`/api/beds/${liveId}/camera/reconnect`, {});
+let ptzTimer = null;
+function ptzStart(pan, tilt) {
+  ptzStop();
+  const sp = +$("ptzSpeed").value;
+  const step = () => post(`/api/beds/${liveId}/camera/ptz`, { pan: pan * sp, tilt: tilt * sp, ms: 450 });
+  step();
+  ptzTimer = setInterval(step, 350);
+}
+function ptzStop() { if (ptzTimer) { clearInterval(ptzTimer); ptzTimer = null; } }
+for (const b of $("dpad").querySelectorAll("button[data-pan],button[data-tilt]")) {
+  b.onpointerdown = (e) => { e.preventDefault(); b.setPointerCapture(e.pointerId); ptzStart(+(b.dataset.pan || 0), +(b.dataset.tilt || 0)); };
+  b.onpointerup = b.onpointercancel = ptzStop;
+}
+$("ptzStop").onclick = () => { ptzStop(); post(`/api/beds/${liveId}/camera/ptz`, { ms: 50 }); };
+const KEYS = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] };
+document.addEventListener("keydown", (e) => {
+  if (!$("camPanel").open || !KEYS[e.key] || e.repeat || /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
+  e.preventDefault(); ptzStart(...KEYS[e.key]);
+});
+document.addEventListener("keyup", (e) => { if (KEYS[e.key]) ptzStop(); });
+
+$("probeBtn").onclick = async () => {
+  const ip = $("probeIp").value.trim();
+  if (!ip) return;
+  $("probeResult").textContent = "...";
+  const r = await post("/api/cameras/probe", { ip });
+  if (!r.source) { $("probeResult").textContent = "nothing found"; return; }
+  const d = r.device || {};
+  $("probeResult").textContent = `${d.manufacturer || ""} ${d.model || ""} ` + r.profiles.map((p) => `${p.width}x${p.height}`).join(" ");
+  $("camSrc").value = r.source;
+};
+$("camForm").onsubmit = async (e) => {
+  e.preventDefault();
+  $("camStatus").textContent = "connecting";
+  const r = await post("/api/cameras", { name: $("camName").value || "Bed", source: $("camSrc").value });
+  $("camStatus").textContent = r.id ? "added" : (r.detail || "error");
+  setTimeout(() => camDlg.close(), 1000);
+};
+
+// assistant
+$("aiForm").onsubmit = async (e) => {
+  e.preventDefault();
+  const q = $("aiQ").value.trim();
+  if (!q) return;
+  $("aiAnswer").textContent = "...";
+  try {
+    const r = await post("/api/assistant", { question: q });
+    $("aiAnswer").textContent = r.answer || r.detail || "-";
+  } catch (e) { $("aiAnswer").textContent = "network error"; }
+};
+
+// bed zone: drag a box on the video
+let drawing = false, start = null;
+const zc = $("zoneCanvas");
+$("zoneBtn").onclick = () => {
+  const on = !$("videoWrap").classList.contains("draw");
+  $("videoWrap").classList.toggle("draw", on);
+  $("zoneBtn").classList.toggle("on", on);
+};
+function videoRect() {
+  const img = $("video"), r = img.getBoundingClientRect();
+  const iw = img.naturalWidth || 16, ih = img.naturalHeight || 9, s = Math.min(r.width / iw, r.height / ih);
+  return { x: r.left + (r.width - iw * s) / 2, y: r.top + (r.height - ih * s) / 2, w: iw * s, h: ih * s };
+}
+function norm(e) {
+  const v = videoRect();
+  return { x: Math.min(1, Math.max(0, (e.clientX - v.x) / v.w)), y: Math.min(1, Math.max(0, (e.clientY - v.y) / v.h)) };
+}
+zc.onpointerdown = (e) => { drawing = true; start = norm(e); zc.setPointerCapture(e.pointerId); };
+zc.onpointermove = (e) => {
+  if (!drawing) return;
+  const p = norm(e), v = videoRect(), r = zc.getBoundingClientRect();
+  zc.width = r.width; zc.height = r.height;
+  const c = zc.getContext("2d");
+  c.strokeStyle = "#6fa8dc"; c.setLineDash([5, 4]);
+  c.strokeRect(v.x - r.left + start.x * v.w, v.y - r.top + start.y * v.h, (p.x - start.x) * v.w, (p.y - start.y) * v.h);
+};
+zc.onpointerup = async (e) => {
+  if (!drawing) return;
+  drawing = false;
+  const p = norm(e);
+  zc.getContext("2d").clearRect(0, 0, zc.width, zc.height);
+  $("zoneBtn").click();
+  if (Math.abs(p.x - start.x) < 0.05 || Math.abs(p.y - start.y) < 0.05) return;
+  await post(`/api/beds/${liveId}/zone`, { x1: start.x, y1: start.y, x2: p.x, y2: p.y });
+};
+
+// breath count check: nurse taps each breath for 60s (space works too)
+let val = null;
+$("valStart").onclick = () => {
+  val = { t0: performance.now(), taps: [] };
+  $("valTap").disabled = false; $("valStart").disabled = true; $("valStatus").className = "";
+  const tick = setInterval(() => {
+    const left = 60 - (performance.now() - val.t0) / 1000;
+    $("valStatus").textContent = `${Math.ceil(left)}s  n=${val.taps.length}`;
+    if (left <= 0) { clearInterval(tick); finishValidation(); }
+  }, 200);
+};
+function tap() { if (val) { val.taps.push(performance.now()); Sound.enabled && Sound.beep(false); } }
+$("valTap").onclick = tap;
+document.addEventListener("keydown", (e) => {
+  if (e.code === "Space" && val && !/INPUT|TEXTAREA/.test(document.activeElement?.tagName)) { e.preventDefault(); tap(); }
+});
+async function finishValidation() {
+  const t = val.taps, dur = (performance.now() - val.t0) / 1000;
+  $("valTap").disabled = true; $("valStart").disabled = false;
+  val = null;
+  if (t.length < 3) { $("valStatus").textContent = "too few taps"; return; }
+  const manual = ((t.length - 1) / ((t[t.length - 1] - t[0]) / 1000)) * 60;
+  const r = await post(`/api/beds/${liveId}/validate`, { duration_s: dur, manual_rr: manual });
+  if (r.queued) { $("valStatus").textContent = `manual ${r.manual_rr}`; return; }
+  $("valStatus").className = r.pass ? "ok" : "bad";
+  $("valStatus").textContent = `manual ${r.manual_rr} / sys ${r.system_rr ?? "-"} / err ${r.error ?? "-"}`;
+}
+</script>
+</body>
+</html>

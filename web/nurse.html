@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>nurse</title>
+<link rel="stylesheet" href="/static/style.css?v=2">
+<style>
+  body { font-size: 14px; }
+  .alerts td { padding: 6px 8px; }
+  .alerts button { padding: 6px 10px; margin: 2px 0 0 4px; }
+  #gate { position: fixed; inset: 0; background: var(--bg); display: grid; place-items: center; z-index: 60; }
+  #gate button { padding: 14px 28px; font-size: 16px; }
+</style>
+</head>
+<body>
+<div id="gate"><button id="enable">enable alerts</button></div>
+<div class="flash" id="flash"></div>
+<div class="bar"><b>nurse</b><span><i class="dot" id="conn"></i></span><span class="sp"></span><span id="clock" class="dim"></span></div>
+<div class="page">
+  <div class="box"><div class="hd">active alerts</div><table class="alerts" id="alerts"></table></div>
+  <div class="box"><div class="hd">talk <span id="talkBed" class="faint"></span></div>
+    <div class="bd row">
+      <button data-say="n_coming">coming</button><button data-say="n_stay">stay in bed</button>
+      <button data-say="n_howareyou">ok?</button><button id="ptt">hold to talk</button>
+    </div>
+  </div>
+  <div class="box"><div class="hd">beds</div><table id="beds"></table></div>
+</div>
+<script src="/static/common.js?v=2"></script>
+<script>
+let talkBed = null;
+clock($("clock"));
+document.querySelectorAll("[data-say]").forEach((b) => b.onclick = () => talkBed && post(`/api/beds/${talkBed}/say`, { preset: b.dataset.say }));
+holdToRecord($("ptt"), (blob) => talkBed && postAudio(`/api/beds/${talkBed}/say_audio`, blob));
+$("enable").onclick = async () => {
+  Sound.enable(); Voice.on = true; Sound.beep(false);
+  try { await navigator.wakeLock?.request("screen"); } catch (e) {}
+  $("gate").remove();
+};
+
+const watch = alertWatcher((a, escalated) => {
+  Sound.beep(a.severity === "critical" || escalated);
+  Voice.say(a, escalated);
+  if (a.severity === "critical") $("flash").classList.add("on");
+});
+
+connect((s) => {
+  const active = s.alerts.filter((a) => a.active);
+  setHTML($("alerts"), active.map((a) => `
+    <tr class="${a.severity} act"><td>
+      <b>${esc(a.bed_name)}</b> <span class="dim">${hm(a.ts)}</span>${a.escalated ? ' <span class="t red">esc</span>' : ""}<br>${esc(a.message)}<br>
+      <button onclick="post('/api/alerts/${a.id}/ack')">ack</button><button onclick="post('/api/alerts/${a.id}/feedback',{value:'true'})">real</button><button onclick="post('/api/alerts/${a.id}/feedback',{value:'false'})">false</button>${a.bed_id.startsWith("sim") ? "" : `<button onclick="post('/api/beds/${a.bed_id}/say',{preset:'n_coming'})">say coming</button>`}
+    </td></tr>`).join("") || '<tr><td class="dim">none</td></tr>');
+  const real = s.beds.find((b) => !b.simulated);
+  talkBed = real ? real.id : talkBed;
+  $("talkBed").textContent = real ? real.name : "";
+  if (!active.some((a) => a.severity === "critical")) $("flash").classList.remove("on");
+  $("beds").innerHTML = s.beds.map((b) => `<tr>
+    <td>${esc(b.name)}${b.simulated ? ' <span class="t sim">sim</span>' : ""}</td>
+    <td><span class="t ${b.level}">${esc(b.level_label)}</span></td>
+    <td class="dim">${esc(b.posture_label || "")}</td>
+    <td class="r">${n0(b.rr)} ${ARROWS[b.trend] || ""}</td></tr>`).join("");
+  watch(s.alerts);
+}, (ok) => $("conn").classList.toggle("ok", ok));
+</script>
+</body>
+</html>

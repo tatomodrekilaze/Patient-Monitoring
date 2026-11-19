@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>bedside</title>
+<link rel="stylesheet" href="/static/style.css?v=2">
+<style>
+  /* patient facing: big and simple */
+  body { font-family: system-ui, sans-serif; min-height: 100vh; display: flex; flex-direction: column; }
+  .top { display: flex; justify-content: space-between; padding: 12px 16px; font-size: 20px; border-bottom: 1px solid var(--line); }
+  .mid { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 28px; padding: 16px; text-align: center; }
+  #status { font-size: 26px; color: var(--ok); }
+  #status.alerting { color: var(--warn); }
+  #msg { font-size: clamp(26px, 5vw, 48px); color: #fff; min-height: 1.3em; }
+  #msg small { display: block; font-size: 14px; color: var(--dim); margin-top: 6px; }
+  .signs { display: grid; grid-template-columns: repeat(7, 1fr); border: 1px solid var(--line); }
+  .signs div { padding: 12px 4px; border-right: 1px solid var(--line); font-size: 15px; }
+  .signs div:last-child { border-right: 0; }
+  .signs b { display: block; font-size: 28px; font-family: var(--mono); }
+  .signs .on { background: var(--fg); color: var(--bg); }
+  #help { font-size: 26px; padding: 18px; background: var(--bad); border-color: var(--bad); color: #fff; margin: 0 16px 16px; }
+  #gate { position: fixed; inset: 0; background: var(--bg); display: grid; place-items: center; z-index: 60; }
+  #gate button { font-size: 20px; padding: 14px 30px; }
+  @media (max-width: 700px) { .signs { grid-template-columns: repeat(4, 1fr); } }
+</style>
+</head>
+<body>
+<div id="gate"><button id="start">start</button></div>
+<div class="top"><span id="name"></span><span id="clock" class="dim"></span></div>
+<div class="mid">
+  <div id="status"></div>
+  <div id="msg"></div>
+  <div class="signs" id="signs">
+    <div data-s="1"><b>1</b>water</div><div data-s="2"><b>2</b>toilet</div><div data-s="3"><b>3</b>pain</div>
+    <div data-s="4"><b>4</b>nurse</div><div data-s="5"><b>5</b>help</div><div data-s="ok"><b>+</b>I'm ok</div><div data-s="bad"><b>-</b>worse</div>
+  </div>
+</div>
+<button id="help">HELP</button>
+<script src="/static/common.js?v=2"></script>
+<script>
+const bed = location.pathname.split("/").pop();
+let after = 0, started = false, playing = false;
+const queue = [];
+clock($("clock"));
+$("start").onclick = () => { started = true; Voice.on = true; $("gate").remove(); Sound.enable(); };
+
+function play(m) {
+  if (!started) return;
+  if (m.audio) { queue.push(`/api/beds/${bed}/audio/${m.id}`); next(); }
+  else if (m.text) Voice.speak(m.text);
+}
+function next() {
+  if (playing || !queue.length) return;
+  playing = true;
+  const a = new Audio(queue.shift());
+  const done = () => { playing = false; next(); };
+  a.onended = done; a.onerror = done;
+  a.play().catch(done);
+}
+
+async function poll() {
+  try {
+    const r = await fetch(`/api/bedside/${bed}?after=${after}`);
+    if (r.status === 401) { location.href = "/login?next=" + encodeURIComponent(location.pathname); return; }
+    const s = await r.json();
+    $("name").textContent = s.name;
+    $("status").textContent = s.status;
+    $("status").className = s.alerting ? "alerting" : "";
+    for (const m of s.messages) {
+      after = Math.max(after, m.id);
+      $("msg").innerHTML = `${esc(m.text)}<small>${m.sender === "nurse" ? "nurse, " : ""}${hm(m.ts).slice(0, 5)}</small>`;
+      play(m);
+    }
+    for (const el of $("signs").children) el.classList.toggle("on", String(s.hand) === el.dataset.s);
+  } catch (e) {}
+}
+// skip old messages
+fetch(`/api/bedside/${bed}`).then((r) => r.json()).then((s) => {
+  after = Math.max(0, ...s.messages.map((m) => m.id));
+}).catch(() => {}).finally(() => { poll(); setInterval(poll, 800); });
+$("help").onclick = () => post(`/api/bedside/${bed}/button`);
+</script>
+</body>
+</html>

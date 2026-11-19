@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>report</title>
+<link rel="stylesheet" href="/static/style.css?v=2">
+</head>
+<body>
+<div class="bar"><b id="title">report</b><span id="period" class="dim"></span><span class="sp"></span>
+  <select id="hours"><option value="8">8h</option><option value="24" selected>24h</option><option value="72">72h</option></select>
+  <button onclick="print()">print</button><a class="btn" href="/">dashboard</a></div>
+<div class="page" id="wrap"></div>
+<script src="/static/common.js?v=2"></script>
+<script>
+const bedId = location.pathname.split("/").pop();
+const fmt = (ts) => ts ? new Date(ts * 1000).toISOString().slice(5, 16).replace("T", " ") : "-";
+const KIND = {};
+const row = (k, v, cls = "") => `<tr><td>${k}</td><td class="${cls}">${v ?? "-"}</td></tr>`;
+
+async function load() {
+  const [r, i18n] = await Promise.all([
+    fetch(`/api/beds/${bedId}/report?hours=${$("hours").value}`).then((x) => x.json()),
+    fetch("/api/i18n").then((x) => x.json()).catch(() => ({})),
+  ]);
+  Object.assign(KIND, i18n.alert_titles || {});
+  render(r);
+}
+
+function rrChart(series) {
+  if (!series || series.length < 2) return '<div class="bd faint">no breathing data</div>';
+  const W = 1000, H = 160, t0 = series[0][0], t1 = series[series.length - 1][0];
+  const ys = series.map((p) => p[1]), lo = Math.min(8, ...ys), hi = Math.max(30, ...ys);
+  const x = (t) => ((t - t0) / (t1 - t0 || 1)) * W, y = (v) => H - ((v - lo) / (hi - lo)) * H;
+  const d = series.map((p, i) => `${i ? "L" : "M"}${x(p[0]).toFixed(1)},${y(p[1]).toFixed(1)}`).join("");
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:160px;display:block">
+    <rect x="0" y="${y(20)}" width="${W}" height="${y(12) - y(20)}" fill="#5bb974" opacity=".08"/>
+    <path d="${d}" fill="none" stroke="#6fa8dc" stroke-width="1.5" vector-effect="non-scaling-stroke"/></svg>
+    <div class="faint" style="padding:2px 8px">${fmt(t0)} - ${fmt(t1)}, band 12-20/min</div>`;
+}
+
+function render(r) {
+  const b = r.breathing, s = r.sleep || {}, m = r.mobility || {}, k = r.skin || {}, n = r.neuro || {};
+  $("title").textContent = `report ${r.name || r.bed_id}`;
+  $("period").textContent = `${r.hours}h, monitored ${r.monitored_min}m, in bed ${r.in_bed_min}m`;
+  const cs = m.chair_stands || [], chair = cs.length ? cs[cs.length - 1].count : null;
+  const ft = (n.face_tests || []).slice().reverse();
+  const kinds = Object.entries(r.alerts.by_kind || {}).sort((a, c) => c[1] - a[1]);
+  const tl = (r.alerts.timeline || []).slice().reverse();
+  $("wrap").innerHTML = `
+  <div class="box"><div class="hd">breathing</div>
+    <table class="kv">
+      ${row("baseline", b.baseline != null ? Math.round(b.baseline) + "/min" : null)}
+      ${row("median", b.median != null ? Math.round(b.median) + "/min" : null)}
+      ${row("range", b.min != null ? `${Math.round(b.min)}-${Math.round(b.max)}` : null)}
+      ${row("outside 12-20", b.pct_outside_12_20 != null ? b.pct_outside_12_20 + "%" : null, b.pct_outside_12_20 > 30 ? "warn" : "")}
+      ${row("apneas >= 10s", b.apneas, b.apneas ? "bad" : "")}
+    </table>${rrChart(b.series)}</div>
+  <div class="grid2">
+    <div class="box"><div class="hd">mobility</div><table class="kv">
+      ${row("falls", r.falls.length, r.falls.length ? "bad" : "")}
+      ${row("bed exits", m.bed_exits)}
+      ${row("near falls", m.near_falls, m.near_falls ? "warn" : "")}
+      ${row("chair stand 30s", chair, chair != null && chair < 8 ? "bad" : "")}
+    </table></div>
+    <div class="box"><div class="hd">sleep</div><table class="kv">
+      ${row("asleep", s.asleep_min != null ? s.asleep_min + "m" : null)}
+      ${row("efficiency", s.efficiency_pct != null ? s.efficiency_pct + "%" : null)}
+      ${row("wakeups", s.wakeups)}
+      ${row("longest", s.longest_sleep_min != null ? s.longest_sleep_min + "m" : null)}
+      ${row("rr asleep", s.rr_asleep_median)}
+    </table></div>
+    <div class="box"><div class="hd">skin / care</div><table class="kv">
+      ${row("current position", k.position_min != null ? Math.round(k.position_min) + "m" : null)}
+      ${row("repositions", k.repositions)}
+      ${row("nurse acks", r.care.nurse_acks)}
+      ${row("visits", r.care.visits)}
+      ${row("staff in room", r.care.staff_min != null ? r.care.staff_min + "m" : null)}
+    </table></div>
+    <div class="box"><div class="hd">face tests</div><table>
+      ${ft.map((f) => `<tr><td class="dim">${fmt(f.ts)}</td><td class="${f.asymmetric ? "bad" : ""}">${f.asymmetric ? "weak " + f.side : "symmetric"}</td></tr>`).join("") || '<tr><td class="faint">none</td></tr>'}
+    </table></div>
+  </div>
+  <div class="box"><div class="hd">alerts ${r.alerts.total} (critical ${r.alerts.critical})</div><table>
+    ${kinds.map(([kk, v]) => `<tr><td>${esc(KIND[kk] || kk)}</td><td class="r">${v}</td></tr>`).join("") || '<tr><td class="faint">none</td></tr>'}
+  </table></div>
+  <div class="box"><div class="hd">timeline</div><table>
+    ${tl.map((a) => `<tr><td class="dim nw">${fmt(a.ts)}</td><td class="${a.severity === "critical" ? "bad" : ""}">${esc(a.message || a.kind)}</td></tr>`).join("") || '<tr><td class="faint">none</td></tr>'}
+  </table></div>
+  <div class="faint">camera based screening, not a diagnosis. no video is stored.</div>`;
+}
+$("hours").onchange = load;
+load();
+</script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+*.pt
+*.mp4
+data/
+tests/
+tools/
+__pycache__/
+.git/

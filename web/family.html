@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>status</title>
+<link rel="stylesheet" href="/static/style.css?v=2">
+<style>
+  body { font-family: system-ui, sans-serif; display: grid; place-items: center; min-height: 100vh; padding: 16px; }
+  .box { width: min(380px, 100%); }
+  #status { font-size: 20px; color: #fff; }
+  #status.red { color: var(--warn); }
+</style>
+</head>
+<body>
+<div class="box">
+  <div class="hd" id="name">-</div>
+  <div class="bd">
+    <div id="status">-</div>
+    <table class="kv" style="margin-top:8px">
+      <tr><td>activity</td><td id="activity">-</td></tr>
+      <tr><td>last nurse visit</td><td id="visit">-</td></tr>
+      <tr><td>updated</td><td id="updated">-</td></tr>
+    </table>
+  </div>
+</div>
+<script src="/static/common.js?v=2"></script>
+<script>
+const tok = location.pathname.split("/").pop();
+async function load() {
+  try {
+    const r = await fetch(`/api/family/${tok}`);
+    if (!r.ok) { $("status").textContent = "link expired"; return; }
+    const f = await r.json();
+    $("name").textContent = f.name;
+    $("status").textContent = f.status;
+    $("status").className = f.level === "red" ? "red" : "";
+    $("activity").textContent = f.activity;
+    $("visit").textContent = f.last_visit ? ago(f.last_visit) + " ago" : "-";
+    $("updated").textContent = hm(f.updated);
+  } catch (e) {}
+}
+load();
+setInterval(load, 10000);
+</script>
+</body>
+</html>

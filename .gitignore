@@ -1,0 +1,22 @@
+# models - downloaded / exported locally, see README
+*.pt
+*.task
+*_openvino_model/
+
+# runtime data (event log, replays, settings)
+data/
+
+# recordings
+*.mp4
+*.avi
+
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+.idea/
+.vscode/
+
+# local preview
+docs/readme_preview.html

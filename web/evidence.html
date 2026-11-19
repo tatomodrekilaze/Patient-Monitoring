@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>validation</title>
+<link rel="stylesheet" href="/static/style.css?v=2">
+</head>
+<body>
+<div class="bar"><b>validation</b><span class="dim hide-s">public datasets, details in docs/validation.md</span><span class="sp"></span><a class="btn" href="/">dashboard</a></div>
+<div class="page">
+  <div class="box"><div class="hd">results</div><table id="res"></table></div>
+  <div class="box"><div class="hd">audit log <span class="sp"></span><button id="auditBtn">verify</button></div>
+    <div class="bd"><span id="auditState">-</span><div class="faint" id="auditHead" style="overflow-wrap:anywhere"></div></div></div>
+  <div class="box"><div class="hd">removed</div><table id="cut"></table></div>
+</div>
+<script src="/static/common.js?v=2"></script>
+<script>
+// keep in sync with docs/validation.md
+const RES = [
+  ["falls", "UR Fall, 70 clips", "23/30 caught, 2/40 false", "2s after impact"],
+  ["heart rate", "UBFC-rPPG vs oximeter", "MAE 1.7 bpm, r 0.95", "still, lab light"],
+  ["resp rate", "MPSC-RR", "1.2-1.9/min, 0 false apnea", "chest visible"],
+  ["posture (lying)", "UR Fall, 9825 frames", "77.4%", ""],
+  ["hand signs", "HaGRID, 3600 imgs", "87.7%, fist->false 5%", "photos"],
+  ["eyes closed", "600 faces", "95.3% closed, 100% open", ""],
+  ["face test", "palsynet", "18/23 palsy, 0/22 healthy", "tuned on same set"],
+  ["chair stand", "HMDB51", "0/32 false stands", ""],
+  ["evm view", "synthetic", "x12.9 motion, x36 colour", "display only"],
+];
+$("res").innerHTML = "<tr><th>feature</th><th>data</th><th>result</th><th>caveat</th></tr>" +
+  RES.map((r) => `<tr><td>${r[0]}</td><td class="dim">${r[1]}</td><td>${r[2]}</td><td class="faint">${r[3]}</td></tr>`).join("");
+
+const CUT = [
+  ["cardiac arrest, cpr coach", "no data"], ["sepsis, rigors", "no data"], ["news2, deterioration score", "needs spo2/bp/temp"],
+  ["ahi, breathing patterns", "synthetic only"], ["seizure, agitation, delirium", "not validated"],
+  ["tremor, tug, goniometer", "simulated only"], ["pain face, passive droop", "false alarms"], ["gait speed, fall risk score", "too rough"],
+];
+$("cut").innerHTML = CUT.map(([a, b]) => `<tr><td>${a}</td><td class="faint">${b}</td></tr>`).join("");
+
+async function audit() {
+  const el = $("auditState");
+  el.textContent = "...";
+  try {
+    const r = await fetch("/api/audit/verify").then((x) => x.json());
+    el.className = r.ok ? "ok" : "bad";
+    el.textContent = r.ok ? `chain ok, ${r.records} records` : `BROKEN at line ${r.first_bad_line}`;
+    $("auditHead").textContent = `head ${r.head}` + (r.legacy ? `, ${r.legacy} legacy lines` : "");
+  } catch (e) { el.textContent = "failed"; }
+}
+$("auditBtn").onclick = audit;
+audit();
+</script>
+</body>
+</html>

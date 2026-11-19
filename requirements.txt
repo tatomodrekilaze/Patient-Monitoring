@@ -1,0 +1,12 @@
+ultralytics>=8.3      # YOLO11 pose + ByteTrack (pulls in torch, opencv)
+opencv-python
+numpy
+scipy
+fastapi
+uvicorn
+segno                 # QR codes for phone / family links
+google-genai          # AI assistant + Georgian voice (Gemini on Vertex AI)
+mediapipe             # finger-count hand signals
+anthropic[vertex]     # optional: Claude instead of Gemini for the text assistant
+edge-tts              # optional, speaks typed nurse messages at the bedside
+openvino>=2024.4          # 2x faster YOLO on Intel CPUs (python tools/optimize_models.py)
