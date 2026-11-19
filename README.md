@@ -59,10 +59,6 @@ AGPL-3.0 (Ultralytics YOLO is AGPL).
 
 ## Personal Note
 
-# Patient-Monitoring
-
-## Personal Note
-
 I built this project for **Alte University's MedTech Hackathon**, sponsored by **Tbilisi Medic**. The competition was intended for students in grades 10–12, and the organizers announced that they would select the 10 best teams.
 
 Unfortunately, I didn’t qualify for the top 10. But you know what? After discovering a few interesting things about their security, I started wondering whether they’d qualify for the RaidForums or BreachForums.
